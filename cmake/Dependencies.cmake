@@ -1,15 +1,27 @@
 include(FetchContent)
 
+# Find pkg-config for system-wide library detection
+find_package(PkgConfig REQUIRED)
+
 # PortAudio
-find_package(PortAudio REQUIRED)
+pkg_check_modules(PORTAUDIO REQUIRED portaudio-2.0)
+if(PORTAUDIO_FOUND)
+    message(STATUS "Found PortAudio: ${PORTAUDIO_LIBRARIES}")
+endif()
 
 # RtMidi
-find_package(RtMidi REQUIRED)
+pkg_check_modules(RTMIDI REQUIRED rtmidi)
+if(RTMIDI_FOUND)
+    message(STATUS "Found RtMidi: ${RTMIDI_LIBRARIES}")
+endif()
 
 # FFTW (Optional)
 option(USE_FFTW "Use FFTW for FFT-based pitch detection" ON)
 if(USE_FFTW)
-    find_package(FFTW3 REQUIRED)
+    pkg_check_modules(FFTW3 REQUIRED fftw3)
+    if(FFTW3_FOUND)
+        message(STATUS "Found FFTW3: ${FFTW3_LIBRARIES}")
+    endif()
 endif()
 
 # Qt6 (for GUI)
@@ -39,4 +51,7 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/nlohmann/json.git
     GIT_TAG v3.11.3
 )
-FetchContent_MakeAvailable(json) 
+FetchContent_MakeAvailable(json)
+
+# JUCE Framework
+add_subdirectory(${CMAKE_SOURCE_DIR}/JUCE) 
