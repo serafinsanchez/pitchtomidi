@@ -72,6 +72,20 @@ target_link_libraries(test_audio_input
         audio_input_lib
 )
 
+# Audio Capture test executable
+add_executable(test_capture_audio test_capture_audio.cpp)
+
+target_include_directories(test_capture_audio
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${PORTAUDIO_INCLUDE_DIRS}
+)
+
+target_link_libraries(test_capture_audio
+    PRIVATE
+        audio_input_lib
+)
+
 if(APPLE)
     target_link_libraries(test_audio_midi
         PRIVATE
@@ -95,7 +109,17 @@ if(APPLE)
             "-framework CoreFoundation"
             "-framework CoreServices"
     )
+    
+    target_link_libraries(test_capture_audio
+        PRIVATE
+            "-framework CoreAudio"
+            "-framework AudioToolbox"
+            "-framework AudioUnit"
+            "-framework CoreFoundation"
+            "-framework CoreServices"
+    )
 endif()
 
 add_test(NAME TestAudioMidi COMMAND test_audio_midi)
-add_test(NAME TestAudioInput COMMAND test_audio_input) 
+add_test(NAME TestAudioInput COMMAND test_audio_input)
+add_test(NAME TestCaptureAudio COMMAND test_capture_audio)
