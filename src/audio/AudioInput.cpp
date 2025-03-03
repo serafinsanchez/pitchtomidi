@@ -1,6 +1,9 @@
 #include "audio/AudioInput.hpp"
 #include <iostream>
 #include <algorithm>
+#include <cmath>
+#include <thread>
+#include <chrono>
 
 namespace ptm {
 
@@ -61,6 +64,42 @@ namespace {
             });
         }
         return initialized;
+    }
+
+    // Audio processing callback for captureAudio function
+    int audioProcessingCallback(const void* inputBuffer, void* outputBuffer,
+                               unsigned long framesPerBuffer,
+                               const PaStreamCallbackTimeInfo* timeInfo,
+                               PaStreamCallbackFlags statusFlags,
+                               void* userData) {
+        // Cast input buffer to float
+        const float* input = static_cast<const float*>(inputBuffer);
+        
+        // Check for input buffer
+        if (!input) {
+            return paContinue;
+        }
+        
+        // Calculate RMS level of the audio input
+        float rms = 0.0f;
+        for (unsigned long i = 0; i < framesPerBuffer; i++) {
+            rms += input[i] * input[i];
+        }
+        rms = std::sqrt(rms / framesPerBuffer);
+        
+        // Log RMS level (less frequently to avoid flooding the logs)
+        static int callCount = 0;
+        if (callCount++ % 100 == 0) {
+            std::cout << "Audio input RMS level: " << rms << " (frames: " << framesPerBuffer << ")" << std::endl;
+        }
+        
+        // Check if we've received audio with sufficient level
+        bool* audioDetected = static_cast<bool*>(userData);
+        if (rms > 0.01f) {  // Threshold for considering audio detected
+            *audioDetected = true;
+        }
+        
+        return paContinue;
     }
 }
 
@@ -166,4 +205,86 @@ std::set<double> getSupportedSampleRates(int deviceId) {
     return getSupportedRatesInternal(deviceInfo, deviceId);
 }
 
-} // namespace ptm 
+bool captureAudio(unsigned int bufferSize) {
+    // Ensure PortAudio is initialized
+    if (!ensurePortAudioInitialized()) {
+        std::cerr << "Failed to initialize PortAudio" << std::endl;
+        return false;
+    }
+    
+    // Get default input device
+    PaDeviceIndex deviceId = Pa_GetDefaultInputDevice();
+    if (deviceId == paNoDevice) {
+        std::cerr << "No default input device found" << std::endl;
+        return false;
+    }
+    
+    const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(deviceId);
+    if (!deviceInfo) {
+        std::cerr << "Failed to get device info" << std::endl;
+        return false;
+    }
+    
+    std::cout << "Using input device: " << deviceInfo->name << std::endl;
+    std::cout << "Default sample rate: " << deviceInfo->defaultSampleRate << " Hz" << std::endl;
+    
+    // Set up stream parameters
+    PaStreamParameters inputParams;
+    inputParams.device = deviceId;
+    inputParams.channelCount = 1;  // Mono input
+    inputParams.sampleFormat = paFloat32;
+    inputParams.suggestedLatency = deviceInfo->defaultLowInputLatency;
+    inputParams.hostApiSpecificStreamInfo = nullptr;
+    
+    // Variable to track if audio was detected
+    bool audioDetected = false;
+    
+    // Open stream
+    PaStream* stream = nullptr;
+    PaError err = Pa_OpenStream(
+        &stream,
+        &inputParams,
+        nullptr,  // No output
+        deviceInfo->defaultSampleRate,
+        bufferSize,
+        paClipOff,
+        audioProcessingCallback,
+        &audioDetected
+    );
+    
+    if (err != paNoError) {
+        std::cerr << "Failed to open stream: " << Pa_GetErrorText(err) << std::endl;
+        return false;
+    }
+    
+    // Start stream
+    err = Pa_StartStream(stream);
+    if (err != paNoError) {
+        std::cerr << "Failed to start stream: " << Pa_GetErrorText(err) << std::endl;
+        Pa_CloseStream(stream);
+        return false;
+    }
+    
+    std::cout << "Audio capture started, listening for 3 seconds..." << std::endl;
+    
+    // Listen for a few seconds
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    
+    // Stop and close stream
+    err = Pa_StopStream(stream);
+    if (err != paNoError) {
+        std::cerr << "Failed to stop stream: " << Pa_GetErrorText(err) << std::endl;
+    }
+    
+    err = Pa_CloseStream(stream);
+    if (err != paNoError) {
+        std::cerr << "Failed to close stream: " << Pa_GetErrorText(err) << std::endl;
+    }
+    
+    std::cout << "Audio capture completed" << std::endl;
+    std::cout << "Audio detected: " << (audioDetected ? "YES" : "NO") << std::endl;
+    
+    return true;
+}
+
+} // namespace ptm
