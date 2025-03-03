@@ -79,4 +79,12 @@ bool isSampleRateSupported(int deviceId, double sampleRate);
  */
 std::set<double> getSupportedSampleRates(int deviceId);
 
-} // namespace ptm 
+/**
+ * Captures audio from the default input device for a short period
+ * 
+ * @param bufferSize The size of the buffer to use for audio capture
+ * @return true if audio was successfully captured, false otherwise
+ */
+bool captureAudio(unsigned int bufferSize = 512);
+
+} // namespace ptm
