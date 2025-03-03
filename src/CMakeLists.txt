@@ -23,8 +23,33 @@ target_link_libraries(audio_input_lib
         ${PORTAUDIO_LIB}
 )
 
+# Create audio capture library
+add_library(audio_capture_lib STATIC
+    audio/AudioCapture.cpp
+)
+
+target_include_directories(audio_capture_lib
+    PUBLIC
+        ${CMAKE_SOURCE_DIR}/include
+        ${PORTAUDIO_INCLUDE_DIRS}
+)
+
+target_link_libraries(audio_capture_lib
+    PUBLIC
+        ${PORTAUDIO_LIB}
+)
+
 if(APPLE)
     target_link_libraries(audio_input_lib
+        PUBLIC
+            "-framework CoreAudio"
+            "-framework AudioToolbox"
+            "-framework AudioUnit"
+            "-framework CoreFoundation"
+            "-framework CoreServices"
+    )
+    
+    target_link_libraries(audio_capture_lib
         PUBLIC
             "-framework CoreAudio"
             "-framework AudioToolbox"
@@ -41,7 +66,6 @@ target_sources(PitchToMidi
         gui/MainWindow.h
         gui/PitchToMidiApplication.h
         gui/PitchToMidiApplication.cpp
-        audio/AudioCapture.cpp
 )
 
 target_compile_definitions(PitchToMidi
@@ -83,6 +107,7 @@ target_link_libraries(PitchToMidi
         ${RTMIDI_LIB}
         Qt6::Widgets
         audio_input_lib
+        audio_capture_lib
 )
 
 find_library(PORTAUDIO_LIB portaudio PATHS /opt/homebrew/lib REQUIRED)
@@ -96,4 +121,4 @@ target_link_libraries(PitchToMidi PRIVATE ${FFTW3_LIB})
 
 if(USE_FFTW)
     target_link_libraries(PitchToMidi PRIVATE ${FFTW3_LIB})
-endif() 
+endif()
